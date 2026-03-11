@@ -1,0 +1,23 @@
+{
+auto_https off
+}
+
+http://localhost {
+
+  handle_path /data/* {
+      root * /assets
+  
+      header {
+          Access-Control-Allow-Origin *
+          Access-Control-Allow-Methods GET, OPTIONS
+          Access-Control-Allow-Headers *
+      }
+  
+      file_server
+  }
+  
+  handle {
+      reverse_proxy stac-fastapi:8081
+  }
+
+}

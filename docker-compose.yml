@@ -1,123 +1,71 @@
 services:
 
-  # change to official image when available https://github.com/radiantearth/stac-browser/pull/386
-#  stac-browser:
-#    build:
-#      context: dockerfiles
-#      dockerfile: Dockerfile.browser
-#    ports:
-#      - "${MY_DOCKER_IP:-127.0.0.1}:8085:8085"
-#    depends_on:
-#      - stac-fastapi
-#      - titiler-pgstac
-#      - database
-
   stac-fastapi:
     image: ghcr.io/stac-utils/stac-fastapi-pgstac:5.0.2
-    ports:
-      - "${MY_DOCKER_IP:-127.0.0.1}:8081:8081"
+#    restart: unless-stopped
     environment:
       # Postgres connection
-      - POSTGRES_USER=username
-      - POSTGRES_PASS=password
-      - POSTGRES_DBNAME=postgis
-      - POSTGRES_HOST_READER=database
-      - POSTGRES_HOST_WRITER=database
-      - POSTGRES_PORT=5432
-      - DB_MIN_CONN_SIZE=1
-      - DB_MAX_CONN_SIZE=1
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASS=${POSTGRES_PASSWORD}
+      - POSTGRES_DBNAME=${POSTGRES_DB}
+      - POSTGRES_HOST_READER=${POSTGRES_HOST_READER}
+      - POSTGRES_HOST_WRITER=${POSTGRES_HOST_WRITER}
+      - POSTGRES_PORT=${POSTGRES_PORT}
+      - DB_MIN_CONN_SIZE=${DB_MIN_CONN_SIZE}
+      - DB_MAX_CONN_SIZE=${DB_MAX_CONN_SIZE}
       - STAC_API_KEY=${STAC_API_KEY}
     depends_on:
       - database
     command:
       bash -c "bash /tmp/scripts/wait-for-it.sh -t 120 -h database -p 5432 && uvicorn my_app:app --host 0.0.0.0 --port 8081"
+    expose:
+      - "8081"
     volumes:
       - ./dockerfiles/scripts:/tmp/scripts
       - ./my_app.py:/app/my_app.py
-
-  nginx:
-    image: nginx:alpine
-    ports:
-      - "${MY_DOCKER_IP:-127.0.0.1}:8083:80"
-    volumes:
-      - ./dockerfiles/nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
-      - /home/lmingari/fall3d/fall3d-gfs/data:/usr/share/nginx/html/data:ro
-
-#  titiler-pgstac:
-#    # At the time of writing, rasterio and psycopg wheels are not available for arm64 arch
-#    # so we force the image to be built with linux/amd64
-#    platform: linux/amd64
-#    image: ghcr.io/stac-utils/titiler-pgstac:1.7.2
-#    ports:
-#      - "${MY_DOCKER_IP:-127.0.0.1}:8082:8082"
-#    environment:
-#      # Postgres connection
-#      - POSTGRES_USER=username
-#      - POSTGRES_PASS=password
-#      - POSTGRES_DBNAME=postgis
-#      - POSTGRES_HOST=database
-#      - POSTGRES_PORT=5432
-#      - DB_MIN_CONN_SIZE=1
-#      - DB_MAX_CONN_SIZE=10
-#      # - DB_MAX_QUERIES=10
-#      # - DB_MAX_IDLE=10
-#      # GDAL Config
-#      - CPL_TMPDIR=/tmp
-#      - GDAL_CACHEMAX=75%
-#      - GDAL_INGESTED_BYTES_AT_OPEN=32768
-#      - GDAL_DISABLE_READDIR_ON_OPEN=EMPTY_DIR
-#      - GDAL_HTTP_MERGE_CONSECUTIVE_RANGES=YES
-#      - GDAL_HTTP_MULTIPLEX=YES
-#      - GDAL_HTTP_VERSION=2
-#      - VSI_CACHE=TRUE
-#      - VSI_CACHE_SIZE=536870912
-#      # TiTiler Config
-#      - MOSAIC_CONCURRENCY=1
-#      # AWS S3 endpoint config
-#      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
-#      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
-#    depends_on:
-#      - database
-#    command:
-#      bash -c "bash /tmp/scripts/wait-for-it.sh -t 120 -h database -p 5432 && uvicorn titiler.pgstac.main:app  --host 0.0.0.0 --port 8082"
-#    volumes:
-#      - ./dockerfiles/scripts:/tmp/scripts
-#      - /home/lmingari/fall3d/fall3d-gfs/data:/data
-
-#  tipg:
-#    image: ghcr.io/developmentseed/tipg:1.0.1
-#    ports:
-#      - "${MY_DOCKER_IP:-127.0.0.1}:8083:8083"
-#    environment:
-#      # Postgres connection
-#      - POSTGRES_USER=username
-#      - POSTGRES_PASS=password
-#      - POSTGRES_DBNAME=postgis
-#      - POSTGRES_HOST=database
-#      - POSTGRES_PORT=5432
-#      - DB_MIN_CONN_SIZE=1
-#      - DB_MAX_CONN_SIZE=10
-#    command:
-#      bash -c "bash /tmp/scripts/wait-for-it.sh -t 120 -h database -p 5432 && uvicorn tipg.main:app --host 0.0.0.0 --port 8083"
-#    depends_on:
-#      - database
-#    volumes:
-#      - ./dockerfiles/scripts:/tmp/scripts
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   database:
     image: ghcr.io/stac-utils/pgstac:v0.9.6
+#    restart: unless-stopped
     environment:
-      - POSTGRES_USER=username
-      - POSTGRES_PASSWORD=password
-      - POSTGRES_DB=postgis
-      - PGUSER=username
-      - PGPASSWORD=password
-      - PGDATABASE=postgis
-    ports:
-      - "${MY_DOCKER_IP:-127.0.0.1}:5439:5432"
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DB}
+      - PGUSER=${POSTGRES_USER}
+      - PGPASSWORD=${POSTGRES_PASSWORD}
+      - PGDATABASE=${POSTGRES_DB}
     command: postgres -N 500
     volumes:
       - ./.pgdata:/var/lib/postgresql/data
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  caddy:
+    image: caddy:2.11.2
+#    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./dockerfiles/caddy/Caddyfile:/etc/caddy/Caddyfile
+      - ./dockerfiles/caddy/caddy_data:/data
+      - ./dockerfiles/caddy/caddy_config:/config
+      - ${STAC_DATA_PATH}:/assets:ro
+    depends_on:
+      - stac-fastapi
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
 
 networks:
   default:
