@@ -2,7 +2,7 @@ services:
 
   stac-fastapi:
     image: ghcr.io/stac-utils/stac-fastapi-pgstac:5.0.2
-#    restart: unless-stopped
+    restart: unless-stopped
     environment:
       # Postgres connection
       - POSTGRES_USER=${POSTGRES_USER}
@@ -31,7 +31,7 @@ services:
 
   database:
     image: ghcr.io/stac-utils/pgstac:v0.9.6
-#    restart: unless-stopped
+    restart: unless-stopped
     environment:
       - POSTGRES_USER=${POSTGRES_USER}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
@@ -50,7 +50,7 @@ services:
 
   caddy:
     image: caddy:2.11.2
-#    restart: unless-stopped
+    restart: unless-stopped
     ports:
       - "80:80"
       - "443:443"
